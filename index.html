@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leer sin que te quiten el libro</title>
+<meta name="theme-color" content="#1f2a44">
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--tx:#1d1d1f;--mut:#6b6b70;--acc:#2f5bd3;--line:#e4e1da}
+@media (prefers-color-scheme:dark){:root{--bg:#121316;--card:#1c1d22;--tx:#ececf0;--mut:#9a9aa3;--acc:#7a9bff;--line:#2b2c33}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:190px}
+header{padding:28px 16px 12px;max-width:720px;margin:auto}
+h1{font-size:1.6rem;margin:0 0 4px}
+header p{margin:0;color:var(--mut)}
+ol{list-style:none;padding:0 16px;margin:8px auto;max-width:720px}
+li{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:8px 0;padding:12px 14px;display:flex;gap:12px;align-items:center;cursor:pointer}
+li.off{opacity:.5;cursor:default}
+li.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.n{font-weight:700;color:var(--acc);min-width:2.2em}
+.t{flex:1}
+.s{font-size:.82rem;color:var(--mut)}
+.bar{height:3px;background:var(--line);border-radius:2px;margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--acc);width:0}
+#player{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+#player .in{max-width:720px;margin:auto}
+#now{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px}
+audio{width:100%}
+.ctl{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+button{font:inherit;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:999px;padding:6px 14px;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <h1>Leer sin que te quiten el libro</h1>
+  <p>Podcast de la réplica · 14 episodios</p>
+</header>
+<ol id="list"></ol>
+<div id="player"><div class="in">
+  <div id="now">Elige un episodio</div>
+  <audio id="a" controls preload="metadata"></audio>
+  <div class="ctl">
+    <button id="back">−15 s</button><button id="fwd">+30 s</button>
+    <button id="rate">1×</button><button id="next">Siguiente ›</button>
+  </div>
+</div></div>
+<script>
+const EP=[
+ [1,"Qué hicimos y qué salió",1],[2,"La carrera entre leer y liberar",1],
+ [3,"Los rivales: candados, cuentas dobles y basura retrasada",1],
+ [4,"La solución del paper: el taco de vales",1],[5,"Cómo se hizo la réplica, y cuánto fiarse",1],
+ [6,"Simular 4 procesadores con un solo PC",1],[7,"Rendimiento: quién gana, y el misterio de Folly",1],
+ [8,"Latencia y memoria retenida",1],[9,"¿Es correcto? Detectores y la cota wait-free",1],
+ [10,"Sin Docker: el error escondido y la caché que se llena",1],
+ [11,"El veredicto y los límites",0],[12,"Juicio a la réplica (1): escala, método y Folly",0],
+ [13,"Juicio a la réplica (2): corrección, RAM, estadística y sentencia",0],
+ [14,"Ensayo para la exposición: las preguntas del jurado",0]];
+const a=document.getElementById('a'),list=document.getElementById('list'),now=document.getElementById('now');
+const RATES=[1,1.25,1.5,1.75,2,0.75];
+const ls={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const pos=ls.get('pos',{}),dur=ls.get('dur',{});let cur=null,rate=ls.get('rate',1);
+const src=n=>'audio/ep'+String(n).padStart(2,'0')+'.m4a';
+const fmt=s=>{s=Math.round(s||0);const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?h+' h '+m+' min':m+' min'};
+function render(){list.innerHTML='';EP.forEach(([n,t,ok])=>{const li=document.createElement('li');
+ li.className=(ok?'':'off')+(n===cur?' on':'');
+ const p=pos[n]||0,d=dur[n]||0;
+ li.innerHTML=`<span class="n">${String(n).padStart(2,'0')}</span><div class="t">${t}<div class="s">${ok?(d?(p>5?fmt(p)+' de '+fmt(d):fmt(d)):''):'Próximamente'}</div>${ok&&d?`<div class="bar"><i style="width:${Math.min(100,p/d*100)}%"></i></div>`:''}</div>`;
+ if(ok)li.onclick=()=>play(n);list.appendChild(li)})}
+function play(n,auto=true){cur=n;const e=EP[n-1];a.src=src(n);now.textContent=String(n).padStart(2,'0')+' · '+e[1];
+ a.onloadedmetadata=()=>{dur[n]=a.duration;ls.set('dur',dur);const p=pos[n]||0;if(p>5&&p<a.duration-10)a.currentTime=p;a.playbackRate=rate;render()};
+ if(auto)a.play().catch(()=>{});ls.set('last',n);render();
+ if('mediaSession'in navigator)navigator.mediaSession.metadata=new MediaMetadata({title:e[1],artist:'Episodio '+n,album:'Leer sin que te quiten el libro'})}
+function nextEp(){const n=EP.find(e=>e[0]>cur&&e[2]);if(n)play(n[0])}
+let last=0;a.ontimeupdate=()=>{if(!cur)return;pos[cur]=a.currentTime;if(Date.now()-last>4000){last=Date.now();ls.set('pos',pos);render()}};
+a.onended=()=>{pos[cur]=0;ls.set('pos',pos);nextEp()};
+document.getElementById('back').onclick=()=>a.currentTime=Math.max(0,a.currentTime-15);
+document.getElementById('fwd').onclick=()=>a.currentTime+=30;
+const rb=document.getElementById('rate');rb.textContent=rate+'×';
+rb.onclick=()=>{rate=RATES[(RATES.indexOf(rate)+1)%RATES.length];a.playbackRate=rate;rb.textContent=rate+'×';ls.set('rate',rate)};
+document.getElementById('next').onclick=nextEp;
+render();const l=ls.get('last',null);if(l&&EP[l-1][2])play(l,false);
+</script>
+</body>
+</html>
